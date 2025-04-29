@@ -4,7 +4,7 @@
 
 use anyhow::{Context, Result};
 use clap::{Parser, ValueEnum};
-use hubtools::{FwidGen, RawHubrisArchive};
+use hubtools::RawHubrisArchive;
 use sha2::Sha256;
 use sha3::Sha3_256;
 use std::{fmt, str};
@@ -59,8 +59,8 @@ fn main() -> Result<()> {
         .context("Load RawHubrisArchive")?;
 
     let fwid = match args.digest {
-        Digest::Sha256 => FwidGen::<Sha256>::fwid(&archive)?,
-        Digest::Sha3_256 => FwidGen::<Sha3_256>::fwid(&archive)?,
+        Digest::Sha256 => archive.fwid::<Sha256>()?,
+        Digest::Sha3_256 => archive.fwid::<Sha3_256>()?,
     };
 
     // Display FWID as the string name for the digest from IANA registry and

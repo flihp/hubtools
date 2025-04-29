@@ -24,6 +24,8 @@ pub use archive_builder::HubrisArchiveBuilder;
 pub use bootleby::bootleby_to_archive;
 pub use caboose::{Caboose, CabooseBuilder, CabooseError};
 
+const LPC55_FLASH_PAGE_SIZE: usize = 512;
+
 #[derive(Debug)]
 pub struct RawHubrisImage {
     pub start_addr: u32,
@@ -1023,16 +1025,10 @@ impl RawHubrisArchive {
 
         Err(Error::NoMemoryRange(name.to_string()))
     }
-}
 
-pub const LPC55_FLASH_PAGE_SIZE: usize = 512;
-
-pub trait FwidGen<D: Default + Digest + FixedOutput> {
-    fn fwid(&self) -> Result<Vec<u8>, Error>;
-}
-
-impl<D: Default + Digest + FixedOutput> FwidGen<D> for RawHubrisArchive {
-    fn fwid(&self) -> Result<Vec<u8>, Error> {
+    pub fn fwid<D: Default + Digest + FixedOutput>(
+        &self,
+    ) -> Result<Vec<u8>, Error> {
         let image = self.image.to_binary()?;
         // When calculating the FWID value we aim to capture *all* data from the
         // relevant flash region. The hubris image will reside in one contiguous
