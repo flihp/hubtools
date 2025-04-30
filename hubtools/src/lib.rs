@@ -363,6 +363,25 @@ impl RawHubrisImage {
             .copy_from_slice(input.as_bytes());
         Ok(())
     }
+
+    pub fn fwid<D: Default + Digest + FixedOutput>(
+        &self,
+    ) -> Result<Vec<u8>, Error> {
+        let caboose = self.read_caboose()?;
+        let board = std::str::from_utf8(caboose.board()?)?;
+        if board == "oxide-rot-1" {
+            let pad =
+                LPC55_FLASH_PAGE_SIZE - self.data.len() % LPC55_FLASH_PAGE_SIZE;
+            let mut digest = D::default();
+
+            Digest::update(&mut digest, &self.data);
+            Digest::update(&mut digest, vec![0xff; pad]);
+
+            Ok(digest.finalize().to_vec())
+        } else {
+            Err(Error::CannotCalculateFwid(board.to_string()))
+        }
+    }
 }
 
 const CABOOSE_MAGIC: u32 = 0xcab0005e;
@@ -497,6 +516,15 @@ pub enum Error {
 
     #[error("Failed to convert TOML int to u32: {0}")]
     BadInt(std::num::TryFromIntError),
+
+    #[error("Failed to read caboose from RawImage: {0}")]
+    BadCaboose(#[from] caboose::CabooseError),
+
+    #[error("bad board caboose entry encoding: {0}")]
+    BadBoardEncoding(#[from] std::str::Utf8Error),
+
+    #[error("cannot calculate FWID for board: {0}")]
+    CannotCalculateFwid(String),
 }
 
 ////////////////////////////////////////////////////////////////////////////////
