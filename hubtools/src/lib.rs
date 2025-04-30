@@ -363,6 +363,18 @@ impl RawHubrisImage {
             .copy_from_slice(input.as_bytes());
         Ok(())
     }
+
+    fn fwid<D: Default + Digest + FixedOutput>(
+        &self,
+        pad_count: usize,
+    ) -> Result<Vec<u8>, Error> {
+        let mut digest = D::default();
+
+        Digest::update(&mut digest, &self.data);
+        Digest::update(&mut digest, vec![0xff; pad_count]);
+
+        Ok(digest.finalize().to_vec())
+    }
 }
 
 const CABOOSE_MAGIC: u32 = 0xcab0005e;
@@ -1029,7 +1041,7 @@ impl RawHubrisArchive {
     pub fn fwid<D: Default + Digest + FixedOutput>(
         &self,
     ) -> Result<Vec<u8>, Error> {
-        let image = self.image.to_binary()?;
+        let img_len = self.image.data.len();
         // When calculating the FWID value we aim to capture *all* data from the
         // relevant flash region. The hubris image will reside in one contiguous
         // range identical to the image from the archive however all flash pages
@@ -1049,7 +1061,7 @@ impl RawHubrisArchive {
                 // flash on this chip means all pages from the end of the hubris
                 // image to the end of flash will be unwritten and thus
                 // unreadable.
-                LPC55_FLASH_PAGE_SIZE - image.len() % LPC55_FLASH_PAGE_SIZE
+                LPC55_FLASH_PAGE_SIZE - img_len % LPC55_FLASH_PAGE_SIZE
             }
             Chip::Stm32 => {
                 // On the stm32s flash pages that haven't had any data written to
@@ -1068,15 +1080,11 @@ impl RawHubrisArchive {
                 let name = self.image_name()?;
                 let flash = self.get_flash_range(&name)?;
 
-                flash.end as usize - flash.start as usize - image.len()
+                flash.end as usize - flash.start as usize - img_len
             }
         };
 
-        let mut digest = D::default();
-        Digest::update(&mut digest, &image);
-        Digest::update(&mut digest, vec![0xff; pad]);
-
-        Ok(digest.finalize().to_vec())
+        self.image.fwid::<D>(pad)
     }
 }
 
